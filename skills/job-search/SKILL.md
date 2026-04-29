@@ -1,6 +1,6 @@
 ---
 name: job-search
-description: On-demand job-search pass for Nikita. Pulls jobs from jobmcp, filters against the target profile in MEMORY.md, gathers company context from companymcp, builds a per-job briefing with tiered LLM escalation (Gemini → Haiku → Sonnet → Opus), emails it via gmail-mcp, posts a Slack heads-up, and on a "yes" reply submits a mock application via jobmcp. Trigger phrase: "run job-search pass" (with optional `query=` / `limit=` / `dry-run=true` modifiers).
+description: On-demand job-search pass for Nikita. Pulls jobs from a mock dataset (jobmcp) or live providers (realjobmcp / tavilysearch) selectable via the `backend=` modifier, filters against the target profile in MEMORY.md, gathers company context from companymcp, builds a per-job briefing with tiered LLM escalation (Gemini → Haiku → Sonnet → Opus), emails it via gmail-mcp, posts a Slack heads-up, and on a "yes" reply submits a mock application (mock backend only) via jobmcp. Trigger phrase: "run job-search pass" (with optional `query=` / `limit=` / `backend=mock|real` / `dry-run=true` modifiers).
 metadata:
   { "openclaw": { "emoji": "💼", "requires": { "config": [] } } }
 ---
@@ -15,6 +15,9 @@ On-demand pipeline that turns raw job listings into a decision-ready briefing fo
 - Optional modifiers in the same message:
   - `query="senior data engineer remote"` — overrides the default search query (default is built from `MEMORY.md → TARGET_ROLES`).
   - `limit=N` — max number of jobs to brief in this pass (default 3).
+  - `backend=mock|real` — choose the job-listing source (default `mock`).
+    - `mock` → `jobmcp` (curated mock dataset; supports the full apply-mock path).
+    - `real` → `realjobmcp` (live providers via tavilysearch: tavily/remotive/etc.). The mock-application step is unavailable on this backend; the reply-handler instead asks Nikita to apply manually via `application_url`.
   - `dry-run=true` — produce briefings but skip Gmail send + Slack post (preview only — print the briefings to chat).
 
 Do **not** auto-trigger this skill. It's user-initiated.
@@ -31,7 +34,8 @@ Do **not** auto-trigger this skill. It's user-initiated.
 
 | Server   | Tools                                                                                 |
 | -------- | ------------------------------------------------------------------------------------- |
-| `jobmcp` | `search_jobs`, `get_job`, `list_companies`, `submit_mock_application`                 |
+| `jobmcp` | `search_jobs`, `get_job`, `list_companies`, `submit_mock_application` (mock backend) |
+| `realjobmcp` | `search_job` (singular), `list_job_sources` (live backend, tavilysearch)            |
 | `company`| `company_profile`, `recent_news`, `linkedin_company_lookup`, `linkedin_lookup`, `cached_company_results` |
 | `slack`  | read tools + `conversations_add_message` (channel `C0B0K3X8VND` = `#job-search`)      |
 | `gmail`  | `send_email(subject, body_markdown, to=None, body_html=None)`, `whoami`                |
@@ -46,7 +50,12 @@ Read `MEMORY.md`, `cv.txt`, today's `memory/YYYY-MM-DD.md` (create if missing). 
 
 ### Step 1 — search
 
-Call `jobmcp__search_jobs(query, ...)`. Default query = top 1-2 entries from `TARGET_ROLES`, joined with " OR ". Cap raw results at 30. Drop anything whose id appears in `processed_ids` (the persistent set loaded in Step 0).
+Branch on the `backend` modifier (default `mock`):
+
+- **`backend=mock`** → call `jobmcp__search_jobs(query, ...)`. Returns curated mock listings with stable string ids. Default query = top 1-2 entries from `TARGET_ROLES` joined with " OR ". Cap raw results at 30.
+- **`backend=real`** → call `realjobmcp__search_job(query=..., limit=30, work_mode="remote"|..., sources=[...optional])`. Tool name is **singular** (`search_job`, not `search_jobs`). The result includes a `jobs` array; each job has `source_job_id`, `source`, `url`, `application_url`, `title`, `company`, `location`, `work_mode`, `description`, `tags`, etc. Use `{source}:{source_job_id}` as the canonical id (e.g. `remotive:2090000`); if `source_job_id` is missing, fall back to a sha1 of `url` truncated to 12 hex chars.
+
+Drop anything whose canonical id appears in `processed_ids` (the persistent set loaded in Step 0). The same `jobsearch:processed` Valkey set is shared between both backends — pre-namespaced ids (`remotive:...`, `tavily:...`) keep them from colliding with mock ids.
 
 ### Step 2 — hard-filter (cheap, no LLM)
 
@@ -94,7 +103,7 @@ For each completed briefing (skipped if `dry-run=true`):
 1. **Email:** `gmail__send_email(subject="[JobBrief] <Role> @ <Company> — <match%>", body_markdown=<briefing>)`. Capture `provider_message_id`.
 2. **Slack heads-up:** `slack__conversations_add_message(channel_id="C0B0K3X8VND", text="<Role> @ <Company> — <match%> match. Briefing in inbox. Reply yes/no/skip.")`. Capture the Slack `ts`.
 3. Append `{job_id, role, company, match_pct, gmail_id, slack_ts, sent_at}` to today's `memory/YYYY-MM-DD.md` under a `briefings:` section.
-4. **Mark processed:** `exec("node /home/node/.openclaw/workspace/scripts/processed.js add <job_id>")`. Do this only after the email + Slack post both succeed — partial sends should NOT mark the job processed.
+4. **Mark processed:** `exec("node /home/node/.openclaw/workspace/scripts/processed.js add <canonical_id>")`. Use the canonical id from Step 1 (mock backend: jobmcp id; real backend: `{source}:{source_job_id}` or url-hash fallback). Do this only after the email + Slack post both succeed — partial sends should NOT mark the job processed.
 
 ### Step 7 — wait for reply (only if not dry-run)
 
@@ -105,13 +114,15 @@ This skill **returns** after step 6. The "yes/no/skip" reply path is handled in 
 When the user types **"check job-search replies"** (or runs this skill again with `mode=replies`):
 1. For each entry in today's `memory/YYYY-MM-DD.md → briefings` without a `decision` field, fetch the Slack thread starting at `slack_ts` via `slack__conversations_replies`.
 2. Parse the first reply from Nikita (case-insensitive `yes|no|skip`).
-3. On **yes**: call `jobmcp__submit_mock_application(job_id)`, post a confirmation reply in the Slack thread, and write `decision=apply` + `application_id` to the briefing entry.
+3. On **yes**:
+   - **mock backend** → call `jobmcp__submit_mock_application(job_id)`, post a confirmation reply in the Slack thread, and write `decision=apply` + `application_id` to the briefing entry.
+   - **real backend** → no mock-apply tool exists. Post a Slack reply with the listing's `application_url` ("Apply manually here: <url>") and write `decision=apply_manual` + `application_url` to the briefing entry.
 4. On **no** / **skip**: write `decision=<value>`, post a brief ack in thread.
 
 ## Output to chat
 
 Throughout the pass, narrate progress as bullet lines (the user prefers verbose step-by-step output):
-- `[step 1] searched jobmcp: 17 raw → 9 after dedupe`
+- `[step 1] searched jobmcp (mock): 17 raw → 9 after dedupe` (or `searched realjobmcp (real): 12 raw → 8 after dedupe` for `backend=real`)
 - `[step 2] hard-filter: 9 → 5 (rejected 3 for geo, 1 for dealbreaker)`
 - `[step 4] gathering company context: Acme Corp (acme.io)`
 - `[step 5] heavy synthesis: ✓ briefing 612 words`
