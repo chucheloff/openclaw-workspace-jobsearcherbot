@@ -1,0 +1,11 @@
+# Backups created by tier swap / manual edits
+*.bak-*
+*.bak.*
+
+# Agent runtime state — recreated on each run, not source-of-truth
+state/
+.openclaw/
+
+# Editor / OS junk
+.DS_Store
+*.swp

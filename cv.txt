@@ -1,0 +1,38 @@
+NIKITA CHUCHELOV 
+SOFTWARE DEVELOPER | DATA ENGINEER  
+chucheloﬀ@gmail.com | linkedin.com/in/chuchelov | +77000556848 | Almaty, Kazakhstan 
+SUMMARY 
+Software Engineer with 5+ years in fintech, spanning QA automation, backend development, and 
+data engineering. Builds production-grade systems end-to-end — from REST APIs and LLM 
+integrations to ETL pipelines and financial reporting tooling. 
+SKILLS 
+Python, VBA, C#, DLT, FastAPI, Ollama, ClickHouse, MinIO, SQL, C#, AvaloniaUI, Git, Docker, ArgoCD  
+EXPERIENCE 
+• Software Developer | Data Engineer, RUDATA (Interfax Digital Solutions)  — 2020-Present 
+Moscow, Russia 
+•Built a cross-platform financial reporting automation tool using AvaloniaUI on C#, enabling 
+clients to embed live analytics directly into quarterly reports and eliminating manual data 
+export workflows 
+•Engineered an ETL pipeline in Python with DLT, consolidating data feeds from multiple stock 
+exchanges into a unified data store to improve internal reporting consistency and future-proof 
+the architecture for new source integrations 
+•Developed core market analysis modules as part of the Excel Add-in solution in VBA, giving 
+analysts automated in-sheet calculations that replaced manual multi-step processes and 
+reduced error rates in recurring reports 
+• Freelance Backend Developer, AV3.Studio  — 2023-2025 Moscow, Russia 
+•Designed and deployed REST API services using FastAPI (Python) to serve self-hosted LLM 
+models, enabling video production teams to automate content pipelines without relying on 
+third-party AI platforms 
+•Integrated locally hosted LLM inference into existing client workflows using Ollama, reducing 
+external API dependency and giving teams reproducible, low-latency AI tooling within their 
+own infrastructure 
+• QA Automation Engineer , BetPlanet — 2020 - 2021 Cyprus 
+•Built a mobile test automation suite using Appium with WebDriverIO and JavaScript, covering 
+iOS and Android platforms and reducing regression testing time across release cycles 
+•Conducted combined automated and manual testing on mobile applications to surface edge-
+case defects before production, improving release quality and reducing post-launch bug 
+reports 
+EDUCATION 
+• National University of Science and Technology «MISiS», 2019-2022 Moscow, Russia 
+Department of Engineering Cybernetics - Applied Mathematics and Advanced Science-Based 
+Software Algorithms.
