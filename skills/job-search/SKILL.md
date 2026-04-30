@@ -14,7 +14,7 @@ On-demand pipeline that turns raw job listings into a decision-ready briefing fo
 - User says **"run job-search pass"** (with or without modifiers).
 - Optional modifiers in the same message:
   - `query="senior data engineer remote"` — overrides the default search query (default is built from `MEMORY.md → TARGET_ROLES`).
-  - `limit=N` — max number of jobs to brief in this pass (default 3).
+  - `limit=N` — max number of jobs to brief in this pass (default 5).
   - `backend=mock|real` — choose the job-listing source (default `mock`).
     - `mock` → `jobmcp` (curated mock dataset; supports the full apply-mock path).
     - `real` → `realjobmcp` (live providers via tavilysearch: tavily/remotive/etc.). The mock-application step is unavailable on this backend; the reply-handler instead asks Nikita to apply manually via `application_url`.
@@ -70,7 +70,7 @@ If >10 candidates remain after deterministic filters, escalate to **`cheap`** (H
 
 ### Step 3 — rank & pick top N
 
-Score remaining jobs (0-100) by skill-overlap with `cv.txt`. Use Gemini default for routine cases. **Escalate to `mid`** (Sonnet 4.6) only when ≥3 candidates have ambiguous fit signals (similar scores within 10pts, conflicting JD signals). Sort desc, take top `limit` (default 3).
+Score remaining jobs (0-100) by skill-overlap with `cv.txt`. Use Gemini default for routine cases. **Escalate to `mid`** (Sonnet 4.6) only when ≥3 candidates have ambiguous fit signals (similar scores within 10pts, conflicting JD signals). Sort desc, take top `limit` (default 5).
 
 ### Step 4 — gather company context (per job)
 
