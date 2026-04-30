@@ -81,15 +81,24 @@ Drop anything whose canonical id appears in `processed_ids` (the persistent set 
 
 #### 1c. Mock fallback (only when `backend=real`)
 
-After Step 2 (hard-filter), if the `backend=real` search produced **0 survivors** AND `mock_fallback` is not explicitly `off`:
+**Do not pause the pass to ask the user a question at this point.** Make the decision inline and proceed.
 
-1. Narrate clearly: `[step 1c] real backend returned 0 survivors after hard-filter — falling back to jobmcp (mock) so the rest of the pipeline can still deliver`.
+Trigger the fallback when `backend=real` AND `mock_fallback` is not `off` AND any of:
+
+- 0 survivors after Step 2 hard-filter, OR
+- 0 *qualified* survivors — i.e. none of the survivors clearly match `MEMORY.TARGET_ROLES` + the candidate's core stack from `cv.txt`. A "qualified" match needs (a) the role family to fit (Senior Data/Backend/Platform Engineer or equivalent IC role for this candidate, **not** management/leadership titles like "Head of Engineering" / "Director" / "VP" unless the JD body is unambiguously hands-on IC), and (b) at least one core-stack signal in title/description (Python, ClickHouse, DLT, Airflow, dbt, etc. for this candidate).
+
+When the trigger fires:
+
+1. Narrate clearly: `[step 1c] real backend produced no qualified matches — falling back to jobmcp (mock) so the rest of the pipeline can still deliver`. Include a one-line reason (e.g. "1 survivor was a leadership-track Head-of-Eng role; not IC fit").
 2. Re-run Step 1b against `jobmcp__search_jobs` with the same derived query.
 3. Re-run Step 2 (hard-filter) over the mock result set.
 4. Set `via_fallback = "mock"` on every job from this round; it will be recorded in the briefing entry in `memory/YYYY-MM-DD.md` so reviewers can spot fallback briefings at a glance.
-5. The reply-handler's "yes" path still uses the **original** `backend` setting from this pass (so a fallback-mock briefing also goes through `jobmcp__submit_mock_application` because its job is a jobmcp job with a real string id). This keeps the apply-mock affordance available even for fallback runs.
+5. The reply-handler's "yes" path still uses `jobmcp__submit_mock_application` for fallback briefings (their job is a jobmcp job with a real string id), so the apply-mock affordance still works.
 
-If the real search returned ≥1 survivor, Step 1c is skipped entirely.
+If the real search produced ≥1 *qualified* survivor, Step 1c is skipped — proceed with those into Steps 3-7 as normal.
+
+**Backstop:** if you cannot confidently judge a survivor as qualified vs. unqualified within ~30s of reasoning, treat it as unqualified and fall back. The mock dataset has good matches; failing-fast to it is preferable to debating marginal real-backend listings.
 
 ### Step 2 — hard-filter (cheap, no LLM)
 
